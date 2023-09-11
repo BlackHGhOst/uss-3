@@ -1,5 +1,5 @@
 import os
-
+import requests
 from flask import Flask, request, jsonify
 import sqlite3
 import json
@@ -76,8 +76,7 @@ ussd_menu = {
     "2*2*1*1*1*1*1*1": "Enter the child's date of birth (YYYY-MM-DD) or 0 to go back.",
     "2*2*1*1*1*1*1*1*1": "Enter the child's birth weight (e.g., 3.2 kg) or 0 to go back.",
     "2*2*1*1*1*1*1*1*1*1": "Enter the place of birth or 0 to go back.",
-    "2*2*1*1*1*1*1*1*1*1*1": "Enter the location (e.g., City, Town) or 0 to go back.",
-    "2*2*1*1*1*1*1*1*1*1*1*1": "Child's Particulars saved successfully!",
+    "2*2*1*1*1*1*1*1*1*1*1": "Child's Particulars saved successfully!",
     "2*2*1*1*2": "You selected View Existing Children. Choose a child to view or 0 to go back.",
     "2*2*1*1*2*0": "No child registered. Press 0 to go back and register a child.",
 }
@@ -108,11 +107,13 @@ def retrieve_child_info(user_id, child_index):
             return children[child_index]
     return None
 
-@app.route('/', methods=['POST'])
-def ussd():
-    session_id = request.form.get('sessionId')
-    phone_number = request.form.get('phoneNumber')
-    user_input = request.form.get('text')
+# Handling USSD callback from Africa's Talking
+@app.route('/ussd-callback', methods=['POST'])
+def ussd_callback():
+    # Parse the incoming USSD session data from Africa's Talking
+    session_id = request.json['sessionId']
+    phone_number = request.json['phoneNumber']
+    user_input = request.json['text']
 
     # Check if the user is already registered
     if is_user_registered(session_id):
@@ -133,114 +134,31 @@ def ussd():
         "type": "response"
     }
 
+    # Send the response back to Africa's Talking's USSD API
+    send_ussd_response(response)
+
     return jsonify(response)
 
-def process_ussd_input(session_id, user_input, is_registered):
-    if not is_registered:
-        # Registration process
-        if user_input == "1":
-            return ussd_menu.get("1*1")
-        elif user_input == "1*1":
-            return ussd_menu.get("1*1")
-        elif user_input == "1*1*1":
-            return ussd_menu.get("1*1*1")
-        elif user_input == "1*1*2":
-            return ussd_menu.get("1*1*2")
-        elif user_input == "1*1*3":
-            return ussd_menu.get("1*1*3")
-        elif user_input == "1*1*4":
-            return ussd_menu.get("1*1*4")
-        elif user_input == "1*1*5":
-            return ussd_menu.get("1*1*5")
-        elif user_input == "1*1*1*1":
-            # Save Name in the database
-            insert_registration(session_id, user_input, None, None, None, None, None)
-            return ussd_menu.get("1*1*1*1")
-        elif user_input == "1*1*2*1":
-            # Save NRC Number in the database
-            insert_registration(session_id, None, user_input, None, None, None, None)
-            return ussd_menu.get("1*1*2*1")
-        elif user_input == "1*1*3*1":
-            # Save Number Of Children in the database
-            insert_registration(session_id, None, None, user_input, None, None, None)
-            return ussd_menu.get("1*1*3*1")
-        elif user_input == "1*1*4*1":
-            # Save Health Centre Registered Under in the database
-            insert_registration(session_id, None, None, None, user_input, None, None)
-            return ussd_menu.get("1*1*4*1")
-        elif user_input == "1*1*5*1":
-            # Set Password for the user
-            return ussd_menu.get("1*1*5*1")
-    else:
-        # Returning user options
-        if user_input == "2":
-            return ussd_menu.get("2*1")
-        elif user_input == "2*1":
-            return ussd_menu.get("2*1")
-        elif user_input == "2*1*1":
-            return ussd_menu.get("2*1*1")
-        elif user_input == "2*1*1*1":
-            # Update Name in the database
-            insert_registration(session_id, user_input, None, None, None, None, None)
-            return ussd_menu.get("2*1*1*1")
-        elif user_input == "2*1*1*2":
-            # Update NRC Number in the database
-            insert_registration(session_id, None, user_input, None, None, None, None)
-            return ussd_menu.get("2*1*1*2")
-        elif user_input == "2*1*1*3":
-            # Update Number Of Children in the database
-            insert_registration(session_id, None, None, user_input, None, None, None)
-            return ussd_menu.get("2*1*1*3")
-        elif user_input == "2*1*1*4":
-            # Update Health Centre Registered Under in the database
-            insert_registration(session_id, None, None, None, user_input, None, None)
-            return ussd_menu.get("2*1*1*4")
-        elif user_input == "2*1*1*5":
-            # Change Password for the user
-            return ussd_menu.get("2*1*1*5")
-        elif user_input == "2*2":
-            return ussd_menu.get("2*2")
-        elif user_input == "2*2*1":
-            return ussd_menu.get("2*2*1")
-        elif user_input == "2*2*1*1":
-            return ussd_menu.get("2*2*1*1")
-        elif user_input == "2*2*1*1*1":
-            # User entered PIN successfully, show Child's Particulars menu
-            return ussd_menu.get("2*2*1*1")
-        elif user_input == "2*2*1*1*2":
-            # Retrieve existing children for this user
-            children_info = retrieve_existing_children(session_id)
+# Function to send the USSD response to Africa's Talking's USSD API
+def send_ussd_response(response):
+    username = 'Neville Nyati'  # Replace with your Africa's Talking username
+    api_key = 'dee9d2a1f7961cef99c9d30b8354cb056ba244d8a37835072f23b2350d2ae227'    # Replace with your Africa's Talking API key
+    url = 'https://api.africastalking.com/ussd/send'
 
-            if not children_info:
-                return ussd_menu.get("2*2*1*1*2*0")
+    headers = {
+        'Content-Type': 'application/json',
+        'apiKey': api_key,
+    }
 
-            # Generate a list of child options for viewing
-            children_list = json.loads(children_info)
-            child_options = "\n".join([f"{index + 1}. {child['name']}" for index, child in enumerate(children_list)])
-            return f"Select a child to view:\n{child_options}\n0. Go back"
-        elif user_input.startswith("2*2*1*1*2*"):
-            # User selected a child to view
-            selected_child_index = int(user_input[len("2*2*1*1*2*"):]) - 1
-
-            # Retrieve the selected child's information
-            child_info = retrieve_child_info(session_id, selected_child_index)
-
-            if child_info:
-                # Display the selected child's information
-                return f"Child's Information:\n{child_info}\n0. Go back"
-            else:
-                return "Invalid selection. Please try again or press 0 to go back."
-        # Handling Child's Particulars option
-        elif user_input == "2*2*1*1":
-            # User entered PIN successfully, show Child's Particulars menu
-            return ussd_menu.get("2*2*1*1")
-        elif user_input.startswith("2*2*1*1*1*1"):
-            # User is providing Child's Particulars information
-            particulars_info = user_input[len("2*2*1*1*1*1"):]
-            # Save child's particulars in the database
-            save_child_particulars(session_id, particulars_info)
-            return "Child's Particulars updated successfully!"
+    try:
+        response = requests.post(url, json=response, headers=headers)
+        if response.status_code == 201:
+            print("USSD response sent successfully")
+        else:
+            print("Failed to send USSD response")
+    except Exception as e:
+        print(f"Error sending USSD response: {str(e)}")
 
 if __name__ == '__main__':
     init_db()
-    app.run(host="0.0.0.0",port=int(os.environ.get("PORT",8080)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
