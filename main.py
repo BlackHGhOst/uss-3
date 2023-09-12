@@ -121,6 +121,7 @@ ussd_menu = {
 @app.route('/ussd-callback', methods=['POST'])
 def ussd_callback():
     try:
+        logging.info(f"received data: {request.data}")
         session_id = request.json['sessionId']
         phone_number = request.json['phoneNumber']
         user_input = request.json['text']
@@ -138,7 +139,9 @@ def ussd_callback():
         }
 
         # Send the response back to Africa's Talking's USSD API
-        return jsonify(response), 200
+        send_ussd_response(response)
+        return jsonify(response)
+
     except Exception as e:
         logging.error(f"Error in ussd_callback: {str(e)}")
         return jsonify({"message": "Error processing request"}), 500
@@ -162,8 +165,8 @@ def process_ussd_input(user_input, user_session_data):
 
 # Function to send the USSD response to Africa's Talking's USSD API
 def send_ussd_response(response):
-    username = 'username' # Replace with your Africa's Talking username
-    api_key = 'api_key' # Replace with your Africa's Talking API key
+    username = 'Neville_Nyati' # Replace with your Africa's Talking username
+    api_key = '0631ca4c6bbaa4584b5bd578d9357ff3506f1dd11a839d36786eb0cdca5a7f61' # Replace with your Africa's Talking API key
     url = 'https://api.africastalking.com/ussd/send'
 
     headers = {
