@@ -122,6 +122,14 @@ ussd_menu = {
 def ussd_callback():
     try:
         logging.info(f"received data: {request.data}")
+
+        # Check if the request data is not empty and is JSON
+        if not request.data:
+            raise ValueError("Empty request body")
+
+        if not request.is_json:
+            raise ValueError("Request body is not in JSON format")
+
         session_id = request.json['sessionId']
         phone_number = request.json['phoneNumber']
         user_input = request.json['text']
@@ -144,7 +152,7 @@ def ussd_callback():
 
     except Exception as e:
         logging.error(f"Error in ussd_callback: {str(e)}")
-        return jsonify({"message": "Error processing request"}), 500
+        return jsonify({"status": "Error", "message": str(e)}), 500
 
 def process_ussd_input(user_input, user_session_data):
     if user_input == '':
