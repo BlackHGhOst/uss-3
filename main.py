@@ -5,30 +5,38 @@ import sqlite3
 import json
 import hashlib
 import uuid
+import logging
 
 app = Flask(__name__)
 DATABASE_NAME = 'registration.db'
 
+#Log
+logging.basicConfig(level=logging.INFO)
+
 # Initialize SQLite database
 def init_db():
-    with sqlite3.connect(DATABASE_NAME) as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS registrations (
-                id INTEGER PRIMARY KEY,
-                user_id TEXT,
-                name TEXT,
-                nrc_number TEXT,
-                num_children INTEGER,
-                health_center TEXT,
-                password TEXT,
-                password_salt TEXT,
-                pin TEXT,
-                children_info TEXT
-            )
-        ''')
-    conn.commit()
-    conn.close()
+    try:
+        with sqlite3.connect(DATABASE_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS registrations (
+                    id INTEGER PRIMARY KEY,
+                    user_id TEXT,
+                    name TEXT,
+                    nrc_number TEXT,
+                    num_children INTEGER,
+                    health_center TEXT,
+                    password TEXT,
+                    password_salt TEXT,
+                    pin TEXT,
+                    children_info TEXT
+                )
+            ''')
+        conn.commit()
+    except Exception as e:
+        logging.error(f"Error initializing database: {str(e)}")
+    finally:
+        conn.close()
 
 # Function to hash the password with a salt
 def hash_password(password: str) -> tuple:
@@ -112,25 +120,28 @@ ussd_menu = {
 # Handling USSD callback from Africa's Talking
 @app.route('/ussd-callback', methods=['POST'])
 def ussd_callback():
-    session_id = request.json['sessionId']
-    phone_number = request.json['phoneNumber']
-    user_input = request.json['text']
-    user_session_data = {}
+    try:
+        session_id = request.json['sessionId']
+        phone_number = request.json['phoneNumber']
+        user_input = request.json['text']
+        user_session_data = {}
 
 #existing check
-    response_text = process_ussd_input(user_input, user_session_data) if is_user_registered(session_id) else ussd_menu[
-        "1"]
+        response_text = process_ussd_input(user_input, user_session_data) if is_user_registered(session_id) else ussd_menu[
+            "1"]
 
-    response = {
-        "sessionId": session_id,
-        "phoneNumber": phone_number,
-        "text": response_text,
-        "type": "response"
-    }
+        response = {
+            "sessionId": session_id,
+            "phoneNumber": phone_number,
+            "text": response_text,
+            "type": "response"
+        }
 
-    # Send the response back to Africa's Talking's USSD API
-    send_ussd_response(response)
-    return jsonify(response)
+        # Send the response back to Africa's Talking's USSD API
+        return jsonify(response), 200
+    except Exception as e:
+        logging.error(f"Error in ussd_callback: {str(e)}")
+        return jsonify({"message": "Error processing request"}), 500
 
 def process_ussd_input(user_input, user_session_data):
     if user_input == '':
@@ -151,8 +162,8 @@ def process_ussd_input(user_input, user_session_data):
 
 # Function to send the USSD response to Africa's Talking's USSD API
 def send_ussd_response(response):
-    username = 'Neville_Nyati' # Replace with your Africa's Talking username
-    api_key = '543a7a784502b5d1b22e32a90e89b3d974789809cf29e821e71e627943cdd13b' # Replace with your Africa's Talking API key
+    username = 'username' # Replace with your Africa's Talking username
+    api_key = 'api_key' # Replace with your Africa's Talking API key
     url = 'https://api.africastalking.com/ussd/send'
 
     headers = {
